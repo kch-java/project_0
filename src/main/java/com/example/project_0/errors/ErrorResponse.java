@@ -1,13 +1,4 @@
-package ru.kata.spring.boot_security.demo.errors;
+package com.example.project_0.errors;
 
-public class ErrorResponse {
-    private final String message;
-
-    public ErrorResponse(String message) {
-        this.message = message;
-    }
-
-    public String getMessage() {
-        return message;
-    }
+public record ErrorResponse(String message) {
 }

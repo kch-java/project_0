@@ -1,22 +1,18 @@
 package com.example.project_0;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import com.example.project_0.services.UserServiceImpl;
+import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
-import ru.kata.spring.boot_security.demo.services.UserService;
 
 @Component
+@RequiredArgsConstructor
 class AppRunner implements CommandLineRunner {
 
-    private final UserService userService;
-
-    @Autowired
-    public AppRunner(UserService userService) {
-        this.userService = userService;
-    }
+    private final UserServiceImpl userService;
 
     @Override
-    public void run(String... args) throws Exception {
+    public void run(String... args) {
         userService.createAdmin();
     }
 }

@@ -1,58 +1,53 @@
 package com.example.project_0.configs;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import com.example.project_0.constants.SecurityConstants;
+import com.example.project_0.services.UserServiceImpl;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import ru.kata.spring.boot_security.demo.services.UserServiceImp;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 @Configuration
 @EnableWebSecurity
-public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
+@RequiredArgsConstructor
+public class WebSecurityConfig {
+
     private final SuccessUserHandler successUserHandler;
-    private UserServiceImp userService;
-
-    @Autowired
-    public void setUserService(UserServiceImp userService) {
-        this.userService = userService;
-    }
-
-    public WebSecurityConfig(SuccessUserHandler successUserHandler) {
-        this.successUserHandler = successUserHandler;
-    }
-
-    @Override
-    protected void configure(HttpSecurity http) throws Exception {
-        http
-                .authorizeRequests()
-                .antMatchers("/").permitAll()
-                .antMatchers("/admin/**", "/api/users/**").hasAnyAuthority("ADMIN")
-                .antMatchers("/user/**", "/api/user/**").hasAnyAuthority("USER", "ADMIN")
-                .anyRequest().authenticated()
-                .and()
-                .formLogin().loginPage("/").loginProcessingUrl("/login").successHandler(successUserHandler)
-                .permitAll()
-                .and()
-                .logout().logoutUrl("/logout").logoutSuccessUrl("/")
-                .permitAll()
-                .and()
-                .csrf().disable();
-    }
+    private final UserServiceImpl userService;
+    private final PasswordEncoder passwordEncoder;
 
     @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception
+    {
+        http.authorizeHttpRequests(authorize -> authorize
+                        .requestMatchers(new AntPathRequestMatcher(SecurityConstants.ROOT_PATH)).permitAll()
+                        .requestMatchers(new AntPathRequestMatcher(SecurityConstants.ADMIN_PATH + "/**"),
+                                new AntPathRequestMatcher("/api/users/**")).hasAnyAuthority(SecurityConstants.ADMIN_ROLE)
+                        .requestMatchers(new AntPathRequestMatcher(SecurityConstants.USER_PATH + "/**"),
+                                new AntPathRequestMatcher("/api/user/**")).hasAnyAuthority(SecurityConstants.USER_ROLE, SecurityConstants.ADMIN_ROLE)
+                        .anyRequest().authenticated())
+                .formLogin(formLogin -> formLogin
+                        .loginPage(SecurityConstants.ROOT_PATH)
+                        .loginProcessingUrl("/login")
+                        .successHandler(successUserHandler))
+                .logout(logout -> logout
+                        .logoutUrl("/logout")
+                        .logoutSuccessUrl(SecurityConstants.ROOT_PATH))
+                .csrf(AbstractHttpConfigurer::disable);
+
+        return http.build();
     }
 
     @Bean
     public DaoAuthenticationProvider daoAuthenticationProvider() {
         DaoAuthenticationProvider authenticationProvider = new DaoAuthenticationProvider();
-        authenticationProvider.setPasswordEncoder(passwordEncoder());
+        authenticationProvider.setPasswordEncoder(passwordEncoder);
         authenticationProvider.setUserDetailsService(userService);
         return authenticationProvider;
     }

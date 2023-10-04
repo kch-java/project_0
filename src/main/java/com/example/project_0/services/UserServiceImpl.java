@@ -4,8 +4,9 @@ import com.example.project_0.models.Role;
 import com.example.project_0.models.User;
 import com.example.project_0.repositories.RoleRepository;
 import com.example.project_0.repositories.UserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
+import jakarta.persistence.EntityNotFoundException;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.BeanUtils;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -21,71 +22,69 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
-@Transactional
-public class UserServiceImp implements UserService {
+@Transactional(readOnly = true)
+@RequiredArgsConstructor
+public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
 
-    @Autowired
-    public UserServiceImp(UserRepository userRepository, RoleRepository roleRepository, @Lazy PasswordEncoder passwordEncoder) {
-        this.userRepository = userRepository;
-        this.roleRepository = roleRepository;
-        this.passwordEncoder = passwordEncoder;
-    }
-
     @Override
-    @Transactional(readOnly = true)
-    public User findByUsername(String username) {
-        return userRepository.findByUsername(username);
-    }
-
-    @Override
+    @Transactional
     public void add(User user) {
         encodeUserPassword(user);
         userRepository.save(user);
     }
 
     @Override
+    @Transactional
     public void update(User user) {
-        encodeUserPassword(user);
-        userRepository.save(user);
+        userRepository.findById(user.getId()).map(existingUser -> {
+            BeanUtils.copyProperties(user, existingUser, "id", "createdBy", "createdAt");
+            encodeUserPassword(existingUser);
+            return userRepository.save(existingUser);
+        }).orElseThrow(() -> new EntityNotFoundException("User not found"));
     }
 
     @Override
+    @Transactional
     public void deleteById(Long id) {
         userRepository.deleteById(id);
     }
 
     @Override
-    @Transactional(readOnly = true)
     public User getUserById(Long id) {
-        Optional<User> user = userRepository.findById(id);
-        return user.orElse(new User());
+        return userRepository.findById(id)
+                .orElseThrow(() -> new UsernameNotFoundException(String.format("User with id '%s' not found", id)));
     }
 
     @Override
-    @Transactional(readOnly = true)
     public List<User> listUsers() {
         return userRepository.findAll();
     }
 
     @Override
-    @Transactional(readOnly = true)
+    public User findByUsername(String username) {
+        return userRepository.findByUsername(username);
+    }
+
+    @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        User user = findByUsername(username);
-        if (user == null) {
-            throw new UsernameNotFoundException(String.format("User '%s' not found", username));
-        }
-        return new User(user.getUsername(), user.getPassword(), mapRolesToAuthorities(user.getRoles()));
+        return Optional.ofNullable(findByUsername(username))
+                .map(user -> new User(user.getUsername(), user.getPassword(), mapRolesToAuthorities(user.getRoles())))
+                .orElseThrow(() -> new UsernameNotFoundException(String.format("User '%s' not found", username)));
     }
 
     private Collection<? extends GrantedAuthority> mapRolesToAuthorities(Collection<Role> roles) {
         return roles.stream().map(r -> new SimpleGrantedAuthority(r.getRoleName())).collect(Collectors.toList());
     }
 
-    @Override
+    public void encodeUserPassword(User user) {
+        user.setPassword(passwordEncoder.encode(user.getPassword()));
+    }
+
+    @Transactional
     public void createAdmin() {
         if (userRepository.findByUsername("admin") == null) {
             Role roleAdmin = new Role("ADMIN");
@@ -105,10 +104,5 @@ public class UserServiceImp implements UserService {
             admin.setRoles(adminRoles);
             userRepository.save(admin);
         }
-    }
-
-    @Override
-    public void encodeUserPassword(User user) {
-        user.setPassword(passwordEncoder.encode(user.getPassword()));
     }
 }
