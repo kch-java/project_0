@@ -1,7 +1,7 @@
 package com.example.project_0.configs;
 
 import com.example.project_0.constants.SecurityConstants;
-import com.example.project_0.services.UserServiceImpl;
+import com.example.project_0.services.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,7 +19,7 @@ import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 public class WebSecurityConfig {
 
     private final SuccessUserHandler successUserHandler;
-    private final UserServiceImpl userService;
+    private final UserService userService;
     private final PasswordEncoder passwordEncoder;
 
     @Bean
